@@ -2,105 +2,16 @@
  * multiTask.ino 2017-08-12 14:40
  * derek@wifiboy.org & samsuanchen@gmail.com
  */
-///////////////////////////////////////////////////////////////////////
-//    Multi Tasking Blink, Beep, And Read/Write for WifiBoy esp32    //
-///////////////////////////////////////////////////////////////////////
-// 01. arduino serial input/output
-//.......................................................................................
-#define PRINTF    Serial.printf
-#define PRINTLN   Serial.println
-#define PRINT     Serial.print
-#define WRITE     Serial.write
-#define AVAILABLE Serial.available
-#define READ      Serial.read
+#include "multiTask.h"
+void procLine();
+void chechButton();
 /////////////////////////////////////////////////////////////////////////////////////////
-// 02. process at most 32 tasks, 32 output lines of len<128, 32 input lines of len<1024.
-//.......................................................................................
-#define mTask 32
-#define mOut  32
-#define mInp  32
-#define mTib  1024
-/////////////////////////////////////////////////////////////////////////////////////////
-// 11. FuncP -- the type of pointer to run the function code.
-//.......................................................................................
-typedef void (* FuncP)();
-/////////////////////////////////////////////////////////////////////////////////////////
-// 12. Button -- the type of button having 5 fields and 2 functions.
-//.......................................................................................
-typedef struct Button {  // the type of button.
-  char * name;           // the name of button.
-  int pin;               // the gpio pin number of button. 
-  FuncP onPressUp;       // the code to run on button press up.
-  int level_1;           // the HIGH/LOW pin last level of button.
-  int level_2;           // the HIGH/LOW pin last level of button.
-  void init () {
-    pinMode( pin, INPUT );
-    level_1 = HIGH, level_2 = HIGH;
-  }
-  void check () {
-    int x = digitalRead( pin );
-    if ( level_1==LOW && level_2==LOW && x==HIGH )
-      onPressUp();
-    level_1 = x, level_2 = level_1;
-  }
-};
-/////////////////////////////////////////////////////////////////////////////////////////
-// 13. Task -- the task type haveing 7 fields and 1 function as follows.
-//.......................................................................................
-typedef struct Task {    // the type of Task.
-  char*name;             // task name.
-  int timeDelay;         // time delay to wake up this task (in micro seconds).
-  int times;             // number of times to run this task (NOTE! -1 forever, 0 to remove).
-  unsigned long lastTime;// wait until micros()-lastTime > timeDelay (in micro seconds).
-  FuncP code;            // function code to run this task.
-  int data;
-  int stop = 0;          // stop running of this task
-  void toggle() {
-    stop = 1 - stop;
-  }
-};
-/////////////////////////////////////////////////////////////////////////////////////////
-// 21. tasks -- the task list
-//.......................................................................................
-Task * tasks[mTask];     // the task list.
-Task * _task;            // the running task.
-int    nTask = 0;        // number of tasks in the task list is 0 initially.
-int    iTask;            // the index of running Task.
-/////////////////////////////////////////////////////////////////////////////////////////
-// 22. outLines -- the output line circular buffer.
-//.......................................................................................
-char * outLines[mOut];
-int    nOut = 0; // number of lines in the output line circular buffer.
-int    sOut = 0; // index of the start line in the output line circular buffer.
-Task * _writing;
-/////////////////////////////////////////////////////////////////////////////////////////
-// 23. inpLines -- the input line circular buffer.
-//.......................................................................................
-char * inpLines[mInp];
-int    nInp =     0; // number of lines in input line circular buffer.
-int    sInp =     0; // index of the start line in the input line circular buffer.
-char * tib;          // the terminal input buffer.
-int    nTib =     0; // number of characters in the terminal input buffer.
-Task * _reading;     //
-/////////////////////////////////////////////////////////////////////////////////////////
-// 31. error -- report error and wait forever (in case a serious error happens)
-//.......................................................................................
-void error ( char * fmt, ... ) {
-  char buf[128];
-  va_list args;
-  va_start (args, fmt);
-  vsnprintf (buf, 128, fmt, args);
-  va_end (args);
-  PRINTF(buf);
-  PRINTF("waiting for hardware reset (press back side RESET button)\n");
-  while (true);
-}
-/////////////////////////////////////////////////////////////////////////////////////////
-// 32. addTask -- add a Task to the Task List
-//     To add a tast to the task list is defined as follows.
+// 32. addTask -- add a Task into the Task List
 //.......................................................................................
 void addTask ( char*name, int timeDelay, void code(), int times, int data ) {
-  PRINTF("at %d ms task begin: %s\n",millis(),name);
+  PRINTF( "at %d ms attach task: ", millis() );
+  if ( code == checkingButton ) PRINT( "checkingButton " );
+  PRINTF( "%s 0x%x\n", name, code );
   if ( nTask >= mTask )
     error("addTask(\"%s\",%d,0x%x,%d) as task %d ?? the task list full\n",
       name,timeDelay,code,times,nTask);
@@ -108,14 +19,14 @@ void addTask ( char*name, int timeDelay, void code(), int times, int data ) {
   if ( ! _task )
     error("addTask(\"%s\",%d,0x%x,%d) as task %d ?? no space allocated\n",
       name,timeDelay,code,times,nTask); 
-  _task->stop = 0;
-  _task->name = name;
-  _task->times = times;
-  _task->lastTime = (unsigned long) micros();
+  _task->stop      = 0;
+  _task->name      = name;
+  _task->times     = times;
+  _task->lastTime  = (unsigned long) micros();
   _task->timeDelay = timeDelay;
-  _task->code = code;
-  _task->data = data;
-  tasks[nTask++] = _task;
+  _task->code      = code;
+  _task->data      = data;
+  tasks[nTask++]   = _task;
 }
 /////////////////////////////////////////////////////////////////////////////////////////
 // 33. runTasks -- run all tasts (should be in the onTimer the Arduino loop).
@@ -123,7 +34,7 @@ void addTask ( char*name, int timeDelay, void code(), int times, int data ) {
 void runTasks () {
   for ( iTask = 0; iTask < nTask; iTask++ ) {
     _task = tasks[iTask];
-    if ( _task->stop ) return;
+    if ( _task->stop ) continue;
     unsigned long t = micros();
     unsigned long lastTime = _task->lastTime;
     unsigned long d;
@@ -140,7 +51,7 @@ void runTasks () {
     if ( ! tasks[n]->times ) break;
   }
   if ( n == nTask ) return; // no task of times==0
-  PRINTF("at %d ms task done: %s", millis(), tasks[n]->name);
+  PRINTF("at %d ms remove task: %s", millis(), tasks[n]->name);
   for ( int i = n+1; i < nTask; i++ ) {
     if ( tasks[i]->times )
       tasks[n++] = tasks[i]; // keep all the tasks of times!=0
@@ -153,48 +64,47 @@ void runTasks () {
 /////////////////////////////////////////////////////////////////////////////////////////
 // 41. writing
 //.......................................................................................
-void writing () {
+void writingMessage () {
   int iOut = sOut++ % mOut;
   PRINT( outLines[ iOut ] ); // print next line.
   if ( --nOut )  return; // if the next line is waiting
   _task->times = 0; // remove this writing task.
 }
 /////////////////////////////////////////////////////////////////////////////////////////
-// 42. formatedWrite -- formated print args according to given format
+// 42. initWriting -- formated print args according to given format
 //.......................................................................................
-void formatedWrite ( char * fmt, ... ) {          // print args according to given format
+void initWriting ( char * fmt, ... ) {         // print args according to given format
   char buf[128];                                     // at most 127 characters !!!!!!
-  if ( nOut >= mOut ) return;                        // ignore formatedWrite if too many lines waiting
+  if ( nOut >= mOut ) return;                        // ignore writingMessage if too many lines waiting
   va_list args;                                      // get variable argument list
   va_start (args, fmt);                              // set the start of variable argument list
   vsnprintf (buf, 128, fmt, args);                   // format the output string to buffer
   va_end (args);                                     // end of formating
   char * out = (char *) malloc( strlen(buf) + 1 );   // allocate space to save the string in buffer
   if ( ! out )                                       // if no space for output
-    error("formatedWrite( \"%s\", ... ) ?? no more space is allocated\n", fmt);
+    error("initWriting( \"%s\", ... ) ?? no more space is allocated\n", fmt);
   strcpy(out, buf);                                  // copy the string in buffer
-  if ( ! nOut ) {
-    addTask( "formatedWrite", 1, writing, -1, 0 ); // activate the writing task
+  if ( ! nOut ) {                                    // if no exsiting message yet
+    addTask( "writingMessage", 1, writingMessage, -1, 0 );     // activate the writing task
     _writing = _task;
   }
   outLines[ (sOut + nOut++) % mOut ] = out;   // save into the circular output buffer
 }
 /////////////////////////////////////////////////////////////////////////////////////////
-// 51. readingKey -- Fill each character into the terminal input buffer.
+// 51. readingKeyboard -- Fill each character into the terminal input buffer.
 //.......................................................................................
-void readingKey () {
+void readingKeyboard () {
   if ( ! AVAILABLE() ) return;
   char c = READ();
   if ( c == '\b' ) {
     if ( ! nTib ) return;
     nTib--;
-    formatedWrite("\b \b");
+    PRINTF("\b \b");
     return;
   }
   if ( nTib == mTib || c == '\r' || c == '\n' ) {
     if ( nTib == mTib )
-      formatedWrite("readingKey() !! break input line by len=%d\n",
-        nTib);
+      PRINTF("readingKeyboard() !! break input line by len=%d\n", nTib);
     * (tib + nTib) = '\0';
     procLine();
     return;
@@ -209,7 +119,7 @@ void readingKey () {
 void initReading () {
   nTib = 0;
   tib = (char *) malloc(mTib+1);
-  addTask( "readingKey", 1, readingKey, -1, 0 ); // activate the writing task
+  addTask( "readingKeyboard", 1, readingKeyboard, -1, 0 ); // activate the writing task
 }
 /////////////////////////////////////////////////////////////////////////////////////////
 // 53. procLine -- Process the terminal input buffer.
@@ -223,85 +133,85 @@ void procLine () {
 // 61. plinking.
 //.......................................................................................
 Task * _blinking;
-int led = 4; // gpio pin number 4 for screen (16 for led )
-void ledToggle () { // toggle led after each time delay
-  digitalWrite( led, ! digitalRead( led ) ); // toggle the led
+int screen = 4; // gpio pin number 4 for screen (16 for led )
+void blinkingScreen () { // toggle screen after each time delay
+  digitalWrite( screen, ! digitalRead( screen ) ); // toggle the screen pin level
 }
 void initBlinking () { // activate blinking
-  pinMode( led, OUTPUT );
-  digitalWrite( led, HIGH );
-  addTask( "blink", 500000, ledToggle, -1, HIGH ); // add blinking forever task
+  pinMode( screen, OUTPUT );
+  digitalWrite( screen, HIGH );
+  addTask( "blinkingScreen", 500000, blinkingScreen, -1, HIGH ); // add blinking forever task
   _blinking=_task;
 }
 void toggleBlinking () { // Toggle the blinking task.
-  if ( _blinking->stop ) digitalWrite( led, HIGH );
-  _blinking->stop = 1 - _blinking->stop;
+  _blinking->toggle();
+  if ( _blinking->stop ) digitalWrite( screen, HIGH );
 }
 /////////////////////////////////////////////////////////////////////////////////////////
-// 62. beeping.
+// 62. huming.
 //.......................................................................................
-Task * _beeping ;
+Task * _huming ;
 int beeper = 25; // gpio numbers of beeper
-void beeperToggle () { // toggle beeper
+void humingBeeper () {
   digitalWrite( beeper, ! digitalRead( beeper ) );
 }
-void initBeeping () { // activate beeping
+void initHuming () { // activate huming
   pinMode( beeper, OUTPUT );     // set pin mode of the led direction as output
   digitalWrite( beeper, HIGH );  // turn off the beeper
-  addTask( "beep", 2500, beeperToggle, -1, HIGH ); // add beeping forever task
-  _beeping =_task;
+  addTask( "humingBeeper", 2500, humingBeeper, -1, HIGH ); // add the huming forever task
+  _huming =_task;
 }
-void toggleBeeping () {
-  _beeping->stop = 1 - _beeping->stop;
+void toggleHuming () {
+  _huming->toggle();
 }
-void riseBeeping () {
-  long x = _beeping->timeDelay * 100000;
-  _beeping->timeDelay = x / 105946;
-  PRINTF("at %d ms task riseBeeping %d -- beep\n",
-    millis(), _beeping->timeDelay);
+void riseSemiTone () {
+  long x = _huming->timeDelay * 100000;
+  _huming->timeDelay = x / 105946;
+  PRINTF( "at %d ms huming riseSemiTone to duration %d\n", millis(), _huming->timeDelay);
 }
-void downBeeping () {
-  long x = _beeping->timeDelay * 105946;
-  _beeping->timeDelay = x / 100000;
-  PRINTF("at %d ms task downBeeping %d -- beep\n",
-    millis(), _beeping->timeDelay);
+void downSemiTone () {
+  long x = _huming->timeDelay * 105946;
+  _huming->timeDelay = x / 100000;
+  PRINTF( "at %d ms huming downSemiTone to duration %d\n", millis(), _huming->timeDelay);
 }
 /////////////////////////////////////////////////////////////////////////////////////////
-// 71. LG -- The left green button.
+// 71. The buttons.
 //.......................................................................................
-Button LG = { name:"LG", pin:17, onPressUp:toggleBlinking };
-/////////////////////////////////////////////////////////////////////////////////////////
-// 72. RB -- The right blue button.
-//.......................................................................................
-Button RB = { name:"RB", pin:34, onPressUp:toggleBeeping };
-/////////////////////////////////////////////////////////////////////////////////////////
-// 73. LB -- The left blue button.
-//.......................................................................................
-Button LB = { name:"LB", pin:33, onPressUp:riseBeeping };
-/////////////////////////////////////////////////////////////////////////////////////////
-// 74. LY -- The left yellow button.
-//.......................................................................................
-Button LY = { name:"LY", pin:27, onPressUp:downBeeping };
-/////////////////////////////////////////////////////////////////////////////////////////
+void checkingButton () {
+  _button = (Button *) _task->data;
+  int x = digitalRead( _button->pin );
+  if ( _button->level_1==LOW && _button->level_2==LOW && x==HIGH )
+    _button->onPressUp();
+  _button->level_1 = x;
+  _button->level_2 = _button->level_1;
+}
+void addButton ( char*name, int pin, void onPressUp() ){
+  _button = (Button *) malloc( sizeof( Button ) );
+  if ( ! _button )
+    error( "addButton(\"%s\",%d,0x%x,%d) ?? no space allocated\n", name, pin, onPressUp ); 
+  pinMode( pin, INPUT );
+  _button->name      = name;
+  _button->pin       = pin;
+  _button->onPressUp = onPressUp;
+  _button->level_1   = HIGH;
+  _button->level_2   = HIGH;
+  addTask( name, 10000, checkingButton, -1, (int)_button ); // every 10 milli second
+}
 void setup () {
 //.......................................................................................
-  Serial.begin( 115200 );           // set baud rate to open the serial com port
+  Serial.begin( 115200 );              // set baud rate to open the serial com port
 //.......................................................................................
-  initReading ();                   // activate reading
-  initBlinking();                   // activate blinking
-  initBeeping ();                   // activate beeping
-  formatedWrite("Hello? World?\n"); // activate writing of "Hello? World?\n"
-  formatedWrite("01234! 56789!\n"); // activate writing of "01234! 56789!\n"
-  (&RB)->init();                    // activate toggling of stop/resume  beeping
-  (&LG)->init();                    // activate toggling of stop/resume blinking
-  (&LB)->init();                    // activate rising  semitone of beeping
-  (&LY)->init();                    // activate downing semitone of beeping
+  initReading ();                      // initialize readingKeyboard
+  initBlinking();                      // initialize blinkingScreen
+  initHuming  ();                      // initialize humingBeeper
+  initWriting("Hello? World?\n");      // initialize writingMessage of "Hello? World?\n"
+  initWriting("01234! 56789!\n");      // initialize writingMessage of "01234! 56789!\n"
+  addButton("LG", 17, toggleBlinking); // initialize checkingButton for toggleBlinking
+  addButton("RB", 34, toggleHuming  ); // initialize checkingButton for toggleHuming
+  addButton("LB", 33, riseSemiTone  ); // initialize checkingButton for riseSemiTone
+  addButton("LY", 27, downSemiTone  ); // initialize checkingButton for downSemiTone
 }
 //.......................................................................................
 void loop () {
-  runTasks (),    // run tasks of blinking,  beeping,  and writing
-  (&RB)->check(), // right  blue button -- stop/resume      beeping
-  (&LG)->check(), // left  green button -- stop/resume     blinking
-  (&LB)->check(), // left   blue button -- rise semitone of beeping
-  (&LY)->check(); // left yellow button -- down semitone of beeping
+  runTasks ();    // reading, blinking, huming, writing, and checkingButton
 }
