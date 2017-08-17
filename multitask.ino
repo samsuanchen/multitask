@@ -3,26 +3,44 @@
  * derek@wifiboy.org & samsuanchen@gmail.com
  */
 #include "multiTask.h"
-void procLine();
-void chechButton();
+void setup () {
+//.......................................................................................
+  Serial.begin( 115200 );              // set baud rate to open the serial com port
+//.......................................................................................
+  initReading ();                      // initialize readingKeyboard
+  initBlinking();                      // initialize blinkingScreen
+  initHumming ();                      // initialize hummingBeeper
+  initWriting("Hello? World?\n");      // initialize writingMessage of "Hello? World?\n"
+  initWriting("01234! 56789!\n");      // initialize writingMessage of "01234! 56789!\n"
+  addButton("LR", 32, toggleHumming ); // initialize checkingButton for toggleHumming
+  addButton("LG", 17, toggleBlinking); // initialize checkingButton for toggleBlinking
+  addButton("LB", 33, riseSemiTone  ); // initialize checkingButton for riseSemiTone
+  addButton("LY", 27, downSemiTone  ); // initialize checkingButton for downSemiTone
+  addButton("RB", 34, riseSemiTone  ); // initialize checkingButton for riseSemiTone
+  addButton("RY", 35, downSemiTone  ); // initialize checkingButton for downSemiTone
+}
+//.......................................................................................
+void loop () {
+  runTasks ();    // reading, blinking, humming, writing, and checkingButton
+}
 /////////////////////////////////////////////////////////////////////////////////////////
 // 32. addTask -- add a Task into the Task List
 //.......................................................................................
-void addTask ( char*name, int timeDelay, void code(), int times, int data ) {
+void addTask ( char*name, double timeDelay, void code(), int times, int data ) {
   PRINTF( "at %d ms attach task: ", millis() );
   if ( code == checkingButton ) PRINT( "checkingButton " );
   PRINTF( "%s 0x%x\n", name, code );
   if ( nTask >= mTask )
-    error("addTask(\"%s\",%d,0x%x,%d) as task %d ?? the task list full\n",
+    error("addTask(\"%s\",%e,0x%x,%d) as task %d ?? the task list full\n",
       name,timeDelay,code,times,nTask);
   _task = (Task *) malloc( sizeof( Task ) );
   if ( ! _task )
-    error("addTask(\"%s\",%d,0x%x,%d) as task %d ?? no space allocated\n",
+    error("addTask(\"%s\",%e,0x%x,%d) as task %d ?? no space allocated\n",
       name,timeDelay,code,times,nTask); 
   _task->stop      = 0;
   _task->name      = name;
   _task->times     = times;
-  _task->lastTime  = (unsigned long) micros();
+  _task->lastTime  = micros();
   _task->timeDelay = timeDelay;
   _task->code      = code;
   _task->data      = data;
@@ -35,12 +53,12 @@ void runTasks () {
   for ( iTask = 0; iTask < nTask; iTask++ ) {
     _task = tasks[iTask];
     if ( _task->stop ) continue;
-    unsigned long t = micros();
-    unsigned long lastTime = _task->lastTime;
-    unsigned long d;
-    if ( t > lastTime ) d = t - lastTime;                              // if t not overflow
-    else                d = t + 1 + ( (unsigned long) -1 - lastTime ); // if t     overflow
-    if ( d < _task->timeDelay ) continue;
+    double t = micros();
+    double lastTime = _task->lastTime;
+    double d;
+    if ( t > lastTime ) d = t - lastTime; /*                           // not overflow
+    else                d = t + 1 + ( (double double) -1 - lastTime ); // if  overflow
+*/  if ( d < _task->timeDelay ) continue;
     _task->lastTime = t;
     if ( _task->times >= 0 ) _task->times--;
     _task->code();
@@ -148,31 +166,29 @@ void toggleBlinking () { // Toggle the blinking task.
   if ( _blinking->stop ) digitalWrite( screen, HIGH );
 }
 /////////////////////////////////////////////////////////////////////////////////////////
-// 62. huming.
+// 62. humming.
 //.......................................................................................
-Task * _huming ;
+Task * _humming ;
 int beeper = 25; // gpio numbers of beeper
-void humingBeeper () {
+void hummingBeeper () {
   digitalWrite( beeper, ! digitalRead( beeper ) );
 }
-void initHuming () { // activate huming
+void initHumming () { // activate humming
   pinMode( beeper, OUTPUT );     // set pin mode of the led direction as output
   digitalWrite( beeper, HIGH );  // turn off the beeper
-  addTask( "humingBeeper", 2500, humingBeeper, -1, HIGH ); // add the huming forever task
-  _huming =_task;
+  addTask( "hummingBeeper", 2272.7272727272725, hummingBeeper, -1, HIGH ); // add the humming of A4 task
+  _humming =_task;
 }
-void toggleHuming () {
-  _huming->toggle();
+void toggleHumming () {
+  _humming->toggle();
 }
 void riseSemiTone () {
-  long x = _huming->timeDelay * 100000;
-  _huming->timeDelay = x / 105946;
-  PRINTF( "at %d ms huming riseSemiTone to duration %d\n", millis(), _huming->timeDelay);
+  _humming->timeDelay = _humming->timeDelay / 1.059463;
+  PRINTF( "at %d ms humming riseSemiTone to duration %e us\n", millis(), _humming->timeDelay);
 }
 void downSemiTone () {
-  long x = _huming->timeDelay * 105946;
-  _huming->timeDelay = x / 100000;
-  PRINTF( "at %d ms huming downSemiTone to duration %d\n", millis(), _huming->timeDelay);
+  _humming->timeDelay = _humming->timeDelay * 1.059463;
+  PRINTF( "at %d ms humming downSemiTone to duration %e us\n", millis(), _humming->timeDelay);
 }
 /////////////////////////////////////////////////////////////////////////////////////////
 // 71. The buttons.
@@ -196,22 +212,4 @@ void addButton ( char*name, int pin, void onPressUp() ){
   _button->level_1   = HIGH;
   _button->level_2   = HIGH;
   addTask( name, 10000, checkingButton, -1, (int)_button ); // every 10 milli second
-}
-void setup () {
-//.......................................................................................
-  Serial.begin( 115200 );              // set baud rate to open the serial com port
-//.......................................................................................
-  initReading ();                      // initialize readingKeyboard
-  initBlinking();                      // initialize blinkingScreen
-  initHuming  ();                      // initialize humingBeeper
-  initWriting("Hello? World?\n");      // initialize writingMessage of "Hello? World?\n"
-  initWriting("01234! 56789!\n");      // initialize writingMessage of "01234! 56789!\n"
-  addButton("LG", 17, toggleBlinking); // initialize checkingButton for toggleBlinking
-  addButton("RB", 34, toggleHuming  ); // initialize checkingButton for toggleHuming
-  addButton("LB", 33, riseSemiTone  ); // initialize checkingButton for riseSemiTone
-  addButton("LY", 27, downSemiTone  ); // initialize checkingButton for downSemiTone
-}
-//.......................................................................................
-void loop () {
-  runTasks ();    // reading, blinking, huming, writing, and checkingButton
 }

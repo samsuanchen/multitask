@@ -46,9 +46,9 @@ typedef struct Button {  // the type of button.
 //.......................................................................................
 typedef struct Task {    // the type of Task.
   char*name;             // task name.
-  int timeDelay;         // time delay to wake up this task (in micro seconds).
+  double timeDelay; // time delay to wake up this task (in micro seconds).
   int times;             // number of times to run this task (NOTE! -1 forever, 0 to remove).
-  unsigned long lastTime;// wait until micros()-lastTime > timeDelay (in micro seconds).
+  double lastTime;  // wait until micros()-lastTime > timeDelay (in micro seconds).
   FuncP code;            // function code to run this task.
   int data;
   int stop = 0;          // stop running of this task
