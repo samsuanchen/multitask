@@ -25,3 +25,14 @@ Not very ofen, it seems that RB button could no exactly stop/resume beeping.  Th
 2017-08-14 00:34 fixed bug in runTask (using continue instead of return), changed naming, fixed button checking (duration of 10 ms).  Seems now every thing is okay.
 
 However, to split into 2 files by moving codes to multitask.h, for example the code addTask, is not that easy.
+
+####4. reassign button actions
+
+2017-08-17 10:46 reassign button actions
+
+**LR** button (pin 32 Left red) to stop/resume humming.
+**LG** button (pin 17 Left green) to stop/resume blinking.
+**RB** button (pin 32 Right blue) to stop/resume beeping.
+**RY** button (pin 35 Right yellow) to down humming semitone.
+**LB** button (pin 33 Left blue) to rise humming octave.
+**LY** button (pin 27 Left yellow) to down humming octave.
