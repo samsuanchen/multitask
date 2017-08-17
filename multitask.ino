@@ -16,13 +16,22 @@ void setup () {
   addButton("LG", 17, toggleBlinking); // initialize checkingButton for toggleBlinking
   addButton("LB", 33, riseSemiTone  ); // initialize checkingButton for riseSemiTone
   addButton("LY", 27, downSemiTone  ); // initialize checkingButton for downSemiTone
-  addButton("RB", 34, riseSemiTone  ); // initialize checkingButton for riseSemiTone
-  addButton("RY", 35, downSemiTone  ); // initialize checkingButton for downSemiTone
+  addButton("RB", 34, riseOctave    ); // initialize checkingButton for riseOctave
+  addButton("RY", 35, downOctave    ); // initialize checkingButton for downOctave
 }
 //.......................................................................................
 void loop () {
   runTasks ();    // reading, blinking, humming, writing, and checkingButton
 }
+
+
+
+
+
+
+
+
+
 /////////////////////////////////////////////////////////////////////////////////////////
 // 32. addTask -- add a Task into the Task List
 //.......................................................................................
@@ -189,6 +198,14 @@ void riseSemiTone () {
 void downSemiTone () {
   _humming->timeDelay = _humming->timeDelay * 1.059463;
   PRINTF( "at %d ms humming downSemiTone to duration %e us\n", millis(), _humming->timeDelay);
+}
+void riseOctave () {
+  _humming->timeDelay = _humming->timeDelay / 2;
+  PRINTF( "at %d ms humming riseOctave to duration %e us\n", millis(), _humming->timeDelay);
+}
+void downOctave () {
+  _humming->timeDelay = _humming->timeDelay * 2;
+  PRINTF( "at %d ms humming downOctave to duration %e us\n", millis(), _humming->timeDelay);
 }
 /////////////////////////////////////////////////////////////////////////////////////////
 // 71. The buttons.
