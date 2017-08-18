@@ -36,3 +36,5 @@ However, to split into 2 files by moving codes to multitask.h, for example the c
 **LY** button (pin 27 Left yellow) to down humming semitone.
 **RB** button (pin 32 Right blue) to rise humming octave.
 **RY** button (pin 35 Right yellow) to down humming octave.
+
+####5. use uint16_t notes[12]

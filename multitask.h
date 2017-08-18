@@ -44,13 +44,13 @@ typedef struct Button {  // the type of button.
 /////////////////////////////////////////////////////////////////////////////////////////
 // 13. Task -- the task type haveing 7 fields and 1 function as follows.
 //.......................................................................................
-typedef struct Task {    // the type of Task.
+typedef struct Task { // the type of Task.
   char*name;             // task name.
-  double timeDelay; // time delay to wake up this task (in micro seconds).
+  float timeDelay;      // time delay to wake up this task (in micro seconds).
   int times;             // number of times to run this task (NOTE! -1 forever, 0 to remove).
-  double lastTime;  // wait until micros()-lastTime > timeDelay (in micro seconds).
+  float lastTime;       // wait until micros()-lastTime > timeDelay (in micro seconds).
   FuncP code;            // function code to run this task.
-  int data;
+  int data;              // used for different tasks
   int stop = 0;          // stop running of this task
   void toggle() {
     stop = 1 - stop;

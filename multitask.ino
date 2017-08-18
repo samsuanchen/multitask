@@ -3,28 +3,29 @@
  * derek@wifiboy.org & samsuanchen@gmail.com
  */
 #include "multiTask.h"
+
 void setup () {
 //.......................................................................................
-  Serial.begin( 115200 );              // set baud rate to open the serial com port
+  Serial.begin( 115200 );                // set baud rate to open the serial com port
+  initReading ();                       // initialize readingKeyboard
+  initBlinking();                       // initialize blinkingScreen
+  initHumming ();                       // initialize hummingBeeper
 //.......................................................................................
-  initReading ();                      // initialize readingKeyboard
-  initBlinking();                      // initialize blinkingScreen
-  initHumming ();                      // initialize hummingBeeper
-  initWriting("Hello? World?\n");      // initialize writingMessage of "Hello? World?\n"
-  initWriting("01234! 56789!\n");      // initialize writingMessage of "01234! 56789!\n"
-  addButton("LR", 32, toggleHumming ); // initialize checkingButton for toggleHumming
-  addButton("LG", 17, toggleBlinking); // initialize checkingButton for toggleBlinking
-  addButton("LB", 33, riseSemiTone  ); // initialize checkingButton for riseSemiTone
-  addButton("LY", 27, downSemiTone  ); // initialize checkingButton for downSemiTone
-  addButton("RB", 34, riseOctave    ); // initialize checkingButton for riseOctave
-  addButton("RY", 35, downOctave    ); // initialize checkingButton for downOctave
+  initWriting("Hello? World?\n");       // initialize writingMessage of "Hello? World?\n"
+  initWriting("01234! 56789!\n");       // initialize writingMessage of "01234! 56789!\n"
+//.......................................................................................
+  addButton("LG",  17, toggleBlinking); // initialize checkingButton for toggleBlinking
+  addButton("LR",  32, toggleHumming ); // initialize checkingButton for toggleHumming
+  addButton("LB",  33, riseSemiTone  ); // initialize checkingButton for riseSemiTone
+  addButton("LY",  27, downSemiTone  ); // initialize checkingButton for downSemiTone
+  addButton("RB",  34, riseOctave    ); // initialize checkingButton for riseOctave
+  addButton("RY",  35, downOctave    ); // initialize checkingButton for downOctave
+  addButton("PROG", 0, resetTone     ); // initialize checkingButton for resetTone
 }
 //.......................................................................................
 void loop () {
   runTasks ();    // reading, blinking, humming, writing, and checkingButton
 }
-
-
 
 
 
@@ -62,12 +63,16 @@ void runTasks () {
   for ( iTask = 0; iTask < nTask; iTask++ ) {
     _task = tasks[iTask];
     if ( _task->stop ) continue;
-    double t = micros();
-    double lastTime = _task->lastTime;
-    double d;
-    if ( t > lastTime ) d = t - lastTime; /*                           // not overflow
-    else                d = t + 1 + ( (double double) -1 - lastTime ); // if  overflow
-*/  if ( d < _task->timeDelay ) continue;
+    float t = micros();
+    float lastTime = _task->lastTime;
+    float d;
+    if ( t > lastTime )
+      d = t - lastTime;
+    else {
+      d = t + 1 + ( (float) -1 - lastTime ); // if  overflow
+      PRINTF( "at %d ms %s timeDelay overflow %e\n", millis(), d );
+    }
+    if ( d < _task->timeDelay ) continue;
     _task->lastTime = t;
     if ( _task->times >= 0 ) _task->times--;
     _task->code();
@@ -185,7 +190,7 @@ void hummingBeeper () {
 void initHumming () { // activate humming
   pinMode( beeper, OUTPUT );     // set pin mode of the led direction as output
   digitalWrite( beeper, HIGH );  // turn off the beeper
-  addTask( "hummingBeeper", 2272.7272727272725, hummingBeeper, -1, HIGH ); // add the humming of A4 task
+  addTask( "hummingBeeper", 3822.26, hummingBeeper, -1, HIGH ); // add the humming of C4 task
   _humming =_task;
 }
 void toggleHumming () {
@@ -206,6 +211,11 @@ void riseOctave () {
 void downOctave () {
   _humming->timeDelay = _humming->timeDelay * 2;
   PRINTF( "at %d ms humming downOctave to duration %e us\n", millis(), _humming->timeDelay);
+}
+void resetTone () {
+  PRINTF( "at %d ms humming resetTone\n", millis());
+  setKey("C4");
+  setTone("1"); // 
 }
 /////////////////////////////////////////////////////////////////////////////////////////
 // 71. The buttons.
@@ -230,3 +240,58 @@ void addButton ( char*name, int pin, void onPressUp() ){
   _button->level_2   = HIGH;
   addTask( name, 10000, checkingButton, -1, (int)_button ); // every 10 milli second
 }
+
+float periods[12]={30578.06, 28861.85, 27241.96, 25712.99, 24269.83, 22907.67,21621.96, 20408.42, 19262.98, 18181.82, 17161.35, 16198.16};
+char * keyNames[12]={"C1", "C#1", "D1", "D#1", "E1", "F1", "F#1", "G1", "G1#", "A1", "A#1", "B1" };
+char * keyName = "C4";
+int iKey = 48;
+void setKey(char * name){
+  int j=0;
+  char c0 = name[j++], c1 = name[j++], cLast;
+  if( c0>='C' && c0<='E' ) iKey = (c0-'C')*2;
+  else if( c0=='F' || c0=='G' ) iKey = (c0-'F')*2+5;
+  else if( c0=='A' || c0=='B' ) iKey = (c0-'A')*2+9;
+  else error("setKey(%s) 1st char = '%c' error\n", name, c0);
+  if( c1=='#') {
+    if( c0=='E' || c0=='B') error("setKey(%s) 2nd char = '%c' error\n", name, c1);
+    iKey++, cLast=name[j++];
+  } else if( c1=='b') {
+    if( c0=='C' || c0=='F') error("setKey(%s) 2nd char = '%c' error\n", name, c1);
+    iKey--, cLast=name[j++];
+  } else cLast = c1;
+  if( cLast<'0' || cLast>'9') error("setKey(%s) last char = '%c' error\n", name, cLast);
+  iKey += 12 * (cLast-'1');
+  keyName = name;
+  PRINTF( "at %d ms set humming key %s\n", millis(), keyName );
+}
+float tonePeriod = 3822.26;
+char * toneName = "1";
+int iTone;
+void setTone(char * name) {
+  int j=0;
+  char c0 = name[j++], c1 = name[j++], cLast;
+  if( c0>='1' && c0<='3' ) iTone = (c0-'1')*2;
+  else if( c0=='4' || c0=='5' ) iTone = (c0-'4')*2+5;
+  else if( c0=='6' || c0=='7' ) iTone = (c0-'6')*2+9;
+  else error( "setTone(%s) 1st char = '%c' error\n", name, c0 );
+  if( c1=='#') {
+    if( c0=='3' || c0=='7') error( "setTone(%s) 2nd char = '%c' error\n", name, c1 );
+    iTone++, cLast=name[j++];
+  } else if( c1=='b') {
+    if( c0=='1' || c0=='4') error( "setTone(%s) 2nd char = '%c' error\n", name, c1 );
+    iTone--, cLast=name[j++];
+  } else cLast = c1;
+  while ( cLast=='H' || cLast=='L' ) {
+    if( cLast=='H' ) iTone += 12;
+    if( cLast=='L' ) iTone -= 12;
+    cLast = name[j++];
+  }
+  if( cLast ) error("setTone(%s) the char = '%c' error\n", name, cLast);
+  toneName = name;
+  iTone += iKey;
+  int iR = iTone%12, iQ = iTone/12 - 1;
+  PRINTF( "iKey %d iTone %d iR %d iQ %d\n", iKey, iTone, iR, iQ );
+  _humming->timeDelay = tonePeriod = periods[iR] / pow(2,iQ) + .5;
+  PRINTF( "at %d ms set humming tone %s to duration %e\n", millis(), toneName, tonePeriod );
+}
+
