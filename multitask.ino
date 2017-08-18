@@ -8,6 +8,7 @@ void setup () {
   Serial.begin( 115200 );              // set baud rate to open the serial com port
 //.......................................................................................
   initReading ();                      // initialize readingKeyboard
+//initTiming  ();
   initBlinking();                      // initialize blinkingScreen
   initHumming ();                      // initialize hummingBeeper
   initWriting("Hello? World?\n");      // initialize writingMessage of "Hello? World?\n"
@@ -36,9 +37,9 @@ void loop () {
 // 32. addTask -- add a Task into the Task List
 //.......................................................................................
 void addTask ( char*name, double timeDelay, void code(), int times, int data ) {
-  PRINTF( "at %d ms attach task: ", millis() );
+  PRINTF( " attach task: " );
   if ( code == checkingButton ) PRINT( "checkingButton " );
-  PRINTF( "%s 0x%x\n", name, code );
+  PRINTF( "%s 0x%x\nat %06d", name, code, millis() );
   if ( nTask >= mTask )
     error("addTask(\"%s\",%e,0x%x,%d) as task %d ?? the task list full\n",
       name,timeDelay,code,times,nTask);
@@ -59,15 +60,22 @@ void addTask ( char*name, double timeDelay, void code(), int times, int data ) {
 // 33. runTasks -- run all tasts (should be in the onTimer the Arduino loop).
 //.......................................................................................
 void runTasks () {
+  static int minD = 0, maxD = 0, maxE = 100, indE=0;
   for ( iTask = 0; iTask < nTask; iTask++ ) {
     _task = tasks[iTask];
     if ( _task->stop ) continue;
-    double t = micros();
-    double lastTime = _task->lastTime;
-    double d;
-    if ( t > lastTime ) d = t - lastTime; /*                           // not overflow
-    else                d = t + 1 + ( (double double) -1 - lastTime ); // if  overflow
-*/  if ( d < _task->timeDelay ) continue;
+    unsigned long t = micros();
+    unsigned long lastTime = _task->lastTime;
+    int d = t - lastTime;
+    if ( ! minD ) { minD = d; maxD = d; }
+    if ( d>0 && d<minD ) minD = d;
+    if ( d>maxD ) maxD = d;
+    if ( d<=0 ) {
+    //PRINTF( "\nlastTime %d currTime %d d %d minD %d maxD %d\nat %d\n", lastTime, t, d, minD, maxD, millis() );
+    //while (indE++>=maxE) error("overflow %d times\n", indE);
+      _task->lastTime = t;
+    }
+    if ( d < _task->timeDelay ) continue;
     _task->lastTime = t;
     if ( _task->times >= 0 ) _task->times--;
     _task->code();
@@ -75,18 +83,28 @@ void runTasks () {
   // remove all the tasks of times=0 from the task list
   int n;
   for ( n = 0; n < nTask; n++ ) {
-    if ( ! tasks[n]->times ) break;
+    _task = tasks[n];
+    if ( ! _task->times ) break;
   }
   if ( n == nTask ) return; // no task of times==0
-  PRINTF("at %d ms remove task: %s", millis(), tasks[n]->name);
+  PRINTF(" remove task: %s", tasks[n]->name);
   for ( int i = n+1; i < nTask; i++ ) {
     if ( tasks[i]->times )
       tasks[n++] = tasks[i]; // keep all the tasks of times!=0
     else
       PRINTF(" %s", tasks[i]->name);
   }
-  PRINTLN();
+  PRINTF( "\nat %06d", millis() );
   nTask = n;
+}
+/////////////////////////////////////////////////////////////////////////////////////////
+// 40. timeing
+//.......................................................................................
+void showingTime () {
+  PRINTF( "\nat %06d", millis() );
+}
+void initTiming () {
+  addTask( "showingTime", 1000, showingTime, -1, 0 );
 }
 /////////////////////////////////////////////////////////////////////////////////////////
 // 41. writing
@@ -152,7 +170,7 @@ void initReading () {
 // 53. procLine -- Process the terminal input buffer.
 //.......................................................................................
 void procLine () {
-  PRINTF("\nat %d ms %d characters filled in tib.\n", millis(), nTib);
+  PRINTF(" %d characters filled in tib.\nat %06d ", millis(), nTib);
   for ( int i = 0; i<nTib; i++ ) PRINTF("%02x ", *(tib+i) );
   PRINTLN();
 }
@@ -193,19 +211,19 @@ void toggleHumming () {
 }
 void riseSemiTone () {
   _humming->timeDelay = _humming->timeDelay / 1.059463;
-  PRINTF( "at %d ms humming riseSemiTone to duration %e us\n", millis(), _humming->timeDelay);
+  PRINTF( " humming riseSemiTone to duration %d us\nat %06d", _humming->timeDelay, millis() );
 }
 void downSemiTone () {
   _humming->timeDelay = _humming->timeDelay * 1.059463;
-  PRINTF( "at %d ms humming downSemiTone to duration %e us\n", millis(), _humming->timeDelay);
+  PRINTF( " humming downSemiTone to duration %d us\nat %06d", _humming->timeDelay, millis() );
 }
 void riseOctave () {
   _humming->timeDelay = _humming->timeDelay / 2;
-  PRINTF( "at %d ms humming riseOctave to duration %e us\n", millis(), _humming->timeDelay);
+  PRINTF( " humming riseOctave to duration %d us\nat %06d", _humming->timeDelay, millis() );
 }
 void downOctave () {
   _humming->timeDelay = _humming->timeDelay * 2;
-  PRINTF( "at %d ms humming downOctave to duration %e us\n", millis(), _humming->timeDelay);
+  PRINTF( " humming downOctave to duration %d us\nat %06d", _humming->timeDelay, millis() );
 }
 /////////////////////////////////////////////////////////////////////////////////////////
 // 71. The buttons.

@@ -46,15 +46,15 @@ typedef struct Button {  // the type of button.
 //.......................................................................................
 typedef struct Task {    // the type of Task.
   char*name;             // task name.
-  double timeDelay; // time delay to wake up this task (in micro seconds).
+  int timeDelay; // time delay to wake up this task (in micro seconds).
   int times;             // number of times to run this task (NOTE! -1 forever, 0 to remove).
-  double lastTime;  // wait until micros()-lastTime > timeDelay (in micro seconds).
+  unsigned long lastTime;// wait until micros()-lastTime > timeDelay (in micro seconds).
   FuncP code;            // function code to run this task.
   int data;
   int stop = 0;          // stop running of this task
   void toggle() {
     stop = 1 - stop;
-    PRINTF( "at %d ms %s %s\n", millis(), stop ? " stop " : "resume", name );
+    PRINTF( " %s %s\nat %06d", stop ? " stop " : "resume", name , millis() );
   }
 };
 /////////////////////////////////////////////////////////////////////////////////////////
