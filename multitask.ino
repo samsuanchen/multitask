@@ -1,14 +1,51 @@
 /*
- * multiTask.ino 2017-08-12 14:40
- * derek@wifiboy.org & samsuanchen@gmail.com
- */
+   multiTask.ino 2017-08-12 14:40
+   derek@wifiboy.org & samsuanchen@gmail.com
+*/
 #include "multiTask.h"
 void setup () {
-//.......................................................................................
+  //.......................................................................................
   Serial.begin( 115200 );              // set baud rate to open the serial com port
-//.......................................................................................
+  /*
+  int go=1;
+  int n,nMin=0,nMax=0;
+  int d,dMin,dMax;
+  int it=0;
+  unsigned long currT;
+  unsigned long T[200];
+  unsigned long lastT=micros();
+  for(int i=0;i<200;i++)T[200]=0xa5a5a5a5;
+  do{
+    n=0;
+    while((currT=micros())==lastT)n++;
+    d=currT-lastT;
+    if(!nMin&&!nMax)nMin=nMax=n,dMin=dMax=d;
+    if(nMin>n){
+      PRINTF("\nat %d nMin %d > n %d",millis(),nMin,n);
+      nMin=n;
+    } else if(nMax<n){
+      PRINTF("\nat %d nMax %d < n %d",millis(),nMax,n);
+      nMax=n;
+    }
+    if(currT<lastT) {
+      go=0;
+      PRINTLN();
+      for(int i=it-199, j=0;i<=it;i++){
+        PRINTF("%12x ",T[i%200]);
+        if(++j%5==0)PRINTLN();
+      }
+      error("\nat %d lastT 0x%x +1 0x%x +2 0x%x currT %d n %d .. %d d %d .. %d\n",
+        millis(),lastT,lastT+1,lastT+2,currT,nMin,nMax,dMin,dMax);
+    }
+    T[(it++)%200]=currT;
+    if(dMin>d) dMin=d;
+    else if(dMax<d) dMax=d;
+    lastT=currT;
+  } while(go);
+  */
+  //.......................................................................................
   initReading ();                      // initialize readingKeyboard
-//initTiming  ();
+  //initTiming  ();
   initBlinking();                      // initialize blinkingScreen
   initHumming ();                      // initialize hummingBeeper
   initWriting("Hello? World?\n");      // initialize writingMessage of "Hello? World?\n"
@@ -37,16 +74,16 @@ void loop () {
 // 32. addTask -- add a Task into the Task List
 //.......................................................................................
 void addTask ( char*name, double timeDelay, void code(), int times, int data ) {
-  PRINTF( " attach task: " );
+  PRINTF( "\nat %06d attach task: ", millis() );
   if ( code == checkingButton ) PRINT( "checkingButton " );
-  PRINTF( "%s 0x%x\nat %06d", name, code, millis() );
+  PRINTF( "%s 0x%x ", name, code );
   if ( nTask >= mTask )
     error("addTask(\"%s\",%e,0x%x,%d) as task %d ?? the task list full\n",
-      name,timeDelay,code,times,nTask);
+          name, timeDelay, code, times, nTask);
   _task = (Task *) malloc( sizeof( Task ) );
   if ( ! _task )
     error("addTask(\"%s\",%e,0x%x,%d) as task %d ?? no space allocated\n",
-      name,timeDelay,code,times,nTask); 
+          name, timeDelay, code, times, nTask);
   _task->stop      = 0;
   _task->name      = name;
   _task->times     = times;
@@ -60,20 +97,17 @@ void addTask ( char*name, double timeDelay, void code(), int times, int data ) {
 // 33. runTasks -- run all tasts (should be in the onTimer the Arduino loop).
 //.......................................................................................
 void runTasks () {
-  static int minD = 0, maxD = 0, maxE = 100, indE=0;
   for ( iTask = 0; iTask < nTask; iTask++ ) {
     _task = tasks[iTask];
     if ( _task->stop ) continue;
-    unsigned long t = micros();
-    unsigned long lastTime = _task->lastTime;
-    int d = t - lastTime;
-    if ( ! minD ) { minD = d; maxD = d; }
-    if ( d>0 && d<minD ) minD = d;
-    if ( d>maxD ) maxD = d;
-    if ( d<=0 ) {
-    //PRINTF( "\nlastTime %d currTime %d d %d minD %d maxD %d\nat %d\n", lastTime, t, d, minD, maxD, millis() );
-    //while (indE++>=maxE) error("overflow %d times\n", indE);
-      _task->lastTime = t;
+    long t = micros();
+    long lastTime = _task->lastTime;
+    int d = t>lastTime ? t - lastTime : 0x11111112 - lastTime + t;
+    //PRINTF( "\nat %d lastTime %d 0x%x currTime %d 0x%x d %d 0x%x LONG_MAX 0x%x\n", millis(), lastTime, lastTime, t, t, d, d, LONG_MAX );
+    //error( "\nat %d recalculate d %d %x", millis(), d, d );
+    if ( d<0 ) {
+      PRINTF( "\n(long)0x11111111-lastTime = %d lastTime %d 0x%x currTime %d 0x%x d %d 0x%x LONG_MAX 0x%x\n", millis(), lastTime, lastTime, t, t, d, d, LONG_MAX );
+      error( "\nat %d lastTime %d 0x%x currTime %d 0x%x d %d 0x%x LONG_MAX 0x%x\n", millis(), lastTime, lastTime, t, t, d, d, LONG_MAX );
     }
     if ( d < _task->timeDelay ) continue;
     _task->lastTime = t;
@@ -87,14 +121,13 @@ void runTasks () {
     if ( ! _task->times ) break;
   }
   if ( n == nTask ) return; // no task of times==0
-  PRINTF(" remove task: %s", tasks[n]->name);
-  for ( int i = n+1; i < nTask; i++ ) {
+  PRINTF("\nat %06d remove task: %s", millis(), tasks[n]->name);
+  for ( int i = n + 1; i < nTask; i++ ) {
     if ( tasks[i]->times )
       tasks[n++] = tasks[i]; // keep all the tasks of times!=0
     else
       PRINTF(" %s", tasks[i]->name);
   }
-  PRINTF( "\nat %06d", millis() );
   nTask = n;
 }
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -163,7 +196,7 @@ void readingKeyboard () {
 //.......................................................................................
 void initReading () {
   nTib = 0;
-  tib = (char *) malloc(mTib+1);
+  tib = (char *) malloc(mTib + 1);
   addTask( "readingKeyboard", 1, readingKeyboard, -1, 0 ); // activate the writing task
 }
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -171,7 +204,7 @@ void initReading () {
 //.......................................................................................
 void procLine () {
   PRINTF(" %d characters filled in tib.\nat %06d ", millis(), nTib);
-  for ( int i = 0; i<nTib; i++ ) PRINTF("%02x ", *(tib+i) );
+  for ( int i = 0; i < nTib; i++ ) PRINTF("%02x ", *(tib + i) );
   PRINTLN();
 }
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -186,7 +219,7 @@ void initBlinking () { // activate blinking
   pinMode( screen, OUTPUT );
   digitalWrite( screen, HIGH );
   addTask( "blinkingScreen", 500000, blinkingScreen, -1, HIGH ); // add blinking forever task
-  _blinking=_task;
+  _blinking = _task;
 }
 void toggleBlinking () { // Toggle the blinking task.
   _blinking->toggle();
@@ -204,7 +237,7 @@ void initHumming () { // activate humming
   pinMode( beeper, OUTPUT );     // set pin mode of the led direction as output
   digitalWrite( beeper, HIGH );  // turn off the beeper
   addTask( "hummingBeeper", 2272.7272727272725, hummingBeeper, -1, HIGH ); // add the humming of A4 task
-  _humming =_task;
+  _humming = _task;
 }
 void toggleHumming () {
   _humming->toggle();
@@ -231,15 +264,15 @@ void downOctave () {
 void checkingButton () {
   _button = (Button *) _task->data;
   int x = digitalRead( _button->pin );
-  if ( _button->level_1==LOW && _button->level_2==LOW && x==HIGH )
+  if ( _button->level_1 == LOW && _button->level_2 == LOW && x == HIGH )
     _button->onPressUp();
   _button->level_1 = x;
   _button->level_2 = _button->level_1;
 }
-void addButton ( char*name, int pin, void onPressUp() ){
+void addButton ( char*name, int pin, void onPressUp() ) {
   _button = (Button *) malloc( sizeof( Button ) );
   if ( ! _button )
-    error( "addButton(\"%s\",%d,0x%x,%d) ?? no space allocated\n", name, pin, onPressUp ); 
+    error( "addButton(\"%s\",%d,0x%x,%d) ?? no space allocated\n", name, pin, onPressUp );
   pinMode( pin, INPUT );
   _button->name      = name;
   _button->pin       = pin;

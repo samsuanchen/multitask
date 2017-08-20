@@ -48,13 +48,13 @@ typedef struct Task {    // the type of Task.
   char*name;             // task name.
   int timeDelay; // time delay to wake up this task (in micro seconds).
   int times;             // number of times to run this task (NOTE! -1 forever, 0 to remove).
-  unsigned long lastTime;// wait until micros()-lastTime > timeDelay (in micro seconds).
+  long lastTime;// wait until micros()-lastTime > timeDelay (in micro seconds).
   FuncP code;            // function code to run this task.
   int data;
   int stop = 0;          // stop running of this task
   void toggle() {
     stop = 1 - stop;
-    PRINTF( " %s %s\nat %06d", stop ? " stop " : "resume", name , millis() );
+    PRINTF( "\nat %06d %s %s", millis(), stop ? " stop " : "resume", name );
   }
 };
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -91,6 +91,6 @@ void error ( char * fmt, ... ) {
   vsnprintf (buf, 128, fmt, args);
   va_end (args);
   PRINTF(buf);
-  PRINTF("waiting for hardware reset (press back side RESET button)\n");
+  PRINTF( "\nat %d waiting for hardware reset (press back side RESET button)", millis() );
   while (true);
 }
